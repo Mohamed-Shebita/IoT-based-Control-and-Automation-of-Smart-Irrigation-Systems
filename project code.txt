@@ -1,0 +1,168 @@
+#define BLYNK_TEMPLATE_ID "TMPL2G5dZtEVQ"
+#define BLYNK_TEMPLATE_NAME "project cs"
+#define BLYNK_AUTH_TOKEN "S0_i3EDSn8tCkDT6IA19AMiW1tJHb6-E"
+#define BLYNK_PRINT Serial   
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+
+float voltage =0;
+int val=0;
+
+char auth[] = BLYNK_AUTH_TOKEN;
+
+// Your WiFi credentials.
+char ssid[] =  "Mohammed"; //  "WIFI NAME";
+char pass[] =  ""; //   "WIFI PASS"
+
+#define DHTPIN 2          // D4
+#define DHTTYPE DHT11     // DHT 11
+DHT dht(DHTPIN, DHTTYPE);
+SimpleTimer timer;
+
+int ldrVal = 0;
+int soilVal = 0;
+int ldrin = 5;  // D1
+int soilin = 4; // D2
+int motor = 16; // D0
+const int ANALOG_READ_PIN = A0;
+
+int ledirPin = 13; // D7 choose pin for the LED
+int irPin =15; // D8 choose input pin (for Infrared sensor) 
+int valir = 0;
+
+int trigPin =14;
+int echoPin=0;
+
+#define SOUND_VELOCITY 0.034
+#define CM_TO_INCH 0.393701
+
+long duration;
+float distanceCm;
+float distanceInch;
+void sendSensor()
+{
+  float h = dht.readHumidity();
+  float t = dht.readTemperature(); // or dht.readTemperature(true) for Fahrenheit
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  Blynk.virtualWrite(V1, h);  //V1 is for Humidity
+  Blynk.virtualWrite(V0, t);  //V0 is for Temperature
+}
+
+void Soil_Moisture_Sensor()
+{
+   digitalWrite(ldrin, LOW);
+  digitalWrite(soilin, HIGH);
+  delay(100);
+  soilVal = analogRead(ANALOG_READ_PIN);
+  delay(100);
+  Blynk.virtualWrite(V2,soilVal ); //V2 is for Soil_Moisture_Sensor
+
+}
+void Ldr()
+{
+
+  // read from ldr sensor
+  digitalWrite(ldrin, HIGH);
+  digitalWrite(soilin, LOW);
+  delay(100);
+  ldrVal = analogRead(ANALOG_READ_PIN);
+  // Values from 0-1024
+  Serial.println(ldrVal);
+  // Convert the analog reading to voltage
+  voltage = ldrVal * (3.3 / 1023.0);
+  // print the voltage
+  delay(100);
+  
+}
+void Motor()
+{
+  if (voltage >=1.5 && soilVal >= 200)
+  {
+    // Check if it's dark based on LDR value
+    digitalWrite(motor, HIGH);
+      Serial.print("onnnnn");
+
+    Blynk.virtualWrite(V3,HIGH );
+  }
+  else
+  {
+          Serial.print("offf");
+
+        digitalWrite(motor, LOW);
+    Blynk.virtualWrite(V3,LOW );
+  }
+}
+ void ir()
+ {
+  valir = digitalRead(irPin); // read input value 
+   if (valir == HIGH)
+   { // check if the input is HIGH
+      digitalWrite(ledirPin, LOW); // turn LED OFF 
+      Serial.print(valir);
+      Serial.println("on");
+ Blynk.virtualWrite(V5,HIGH );
+   } 
+   else 
+   { 
+      digitalWrite(ledirPin, HIGH); // turn LED ON 
+      Serial.print(valir);
+      Serial.println("off");
+      Blynk.virtualWrite(V5,LOW );
+   } 
+ }
+void ultrasonic()
+{
+digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin on HIGH state for 10 micro seconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  
+  // Calculate the distance
+  distanceCm =50-(duration * SOUND_VELOCITY/2);
+  
+  
+  // Prints the distance on the Serial Monitor
+  Serial.print("Distance (cm): ");
+  Serial.println(distanceCm);
+
+   Blynk.virtualWrite(V1,distanceCm ); //V2 is for Soil_Moisture_Sensor
+
+  
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  Blynk.begin(auth, ssid, pass);
+  dht.begin();
+  pinMode(ldrin, OUTPUT);
+  pinMode(soilin, OUTPUT);
+  pinMode(motor, OUTPUT);
+  pinMode(ANALOG_READ_PIN, INPUT);
+  pinMode(ledirPin, OUTPUT); 
+  pinMode(irPin, INPUT); 
+  pinMode(trigPin,OUTPUT);
+  pinMode(echoPin,INPUT);
+  timer.setInterval(1000L, sendSensor);
+  timer.setInterval(1000L, Ldr);
+  timer.setInterval(1000L, Soil_Moisture_Sensor);
+  timer.setInterval(1000L, Motor);
+  timer.setInterval(1000L, ir);
+  timer.setInterval(1000L, ultrasonic);
+}
+
+void loop()
+{
+  Blynk.run(); // Initiates Blynk
+  timer.run(); // Initiates SimpleTimer
+}
